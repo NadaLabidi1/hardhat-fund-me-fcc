@@ -16,14 +16,24 @@ const { network } = require("hardhat")
 //     const { getNamedAccounts, deployments } = hre
 // }
 
-const { networkConfig } = require("../helper-hardhat-config")
+const {
+    networkConfig,
+    developementChains,
+} = require("../helper-hardhat-config")
 
 module.exports = async ({ getNamedAccounts, deployments }) => {
     const { deploy, log } = deployments
     const { deployer } = await getNamedAccounts()
     const chainId = network.config.chainId
 
-    const ethUsdPriceFeedAddress = networkConfig[chainId]["ethUsdPriceFeed"]
+    //const ethUsdPriceFeedAddress = networkConfig[chainId]["ethUsdPriceFeed"]
+    let ethUsdPriceFeedAddress
+    if (developementChains.includes(network.name)) {
+        const ethUsdAggregator = await deployments.get("MockV3Aggregator")
+        ethUsdPriceFeedAddress = ethUsdAggregator.address
+    } else {
+        ethUsdPriceFeedAddress = networkConfig[chainId]["ethUsdPriceFeed"]
+    }
 
     // if the contract doesn't exist, we deploy a minimal version for our local testing
 
@@ -31,9 +41,10 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     // when going for localhost or hardhat network we want to use a mock
     const fundMe = await deploy("FundMe", {
         from: deployer,
-        args: [
-            /* address */
-        ], // put price feed address
+        args: [ethUsdPriceFeedAddress], // put price feed address
         log: true,
     })
+
+    log("----------------------------------------------")
 }
+module.exports.tags = ["all", "fundme"]
