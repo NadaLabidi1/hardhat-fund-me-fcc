@@ -19,23 +19,23 @@ contract FundMe {
     using PriceConverter for uint256;
 
     // State Variables
-    mapping(address => uint256) public addressToAmountFunded;
-    address[] public funders;
+    mapping(address => uint256) private s_addressToAmountFunded;
+    address[] private s_funders;
 
     // Could we make this constant?  /* hint: no! We should make it immutable! */
-    address public immutable  owner;
+    address private immutable  i_owner;
     uint256 public constant MINIMUM_USD = 50 * 10 ** 18;
-    AggregatorV3Interface public priceFeed;
+    AggregatorV3Interface private s_priceFeed;
        
     modifier onlyOwner {
         // require(msg.sender == owner);
-        if (msg.sender != owner) revert FundMe__NotOwner();
+        if (msg.sender != i_owner) revert FundMe__NotOwner();
         _;
     }
 
     constructor(address priceFeedAdress) {
-        owner = msg.sender;
-        priceFeed = AggregatorV3Interface(priceFeedAdress);
+        i_owner = msg.sender;
+        s_priceFeed = AggregatorV3Interface(priceFeedAdress);
     }
 
     // receive() external payable {
@@ -51,22 +51,22 @@ contract FundMe {
     */
     function fund() public payable {
         require
-        (msg.value.getConversionRate(priceFeed) >= MINIMUM_USD, 
+        (msg.value.getConversionRate(s_priceFeed) >= MINIMUM_USD, 
         "You need to spend more ETH!"
         );
         // require(PriceConverter.getConversionRate(msg.value) >= MINIMUM_USD, "You need to spend more ETH!");
-        addressToAmountFunded[msg.sender] += msg.value;
-        funders.push(msg.sender);
+        s_addressToAmountFunded[msg.sender] += msg.value;
+        s_funders.push(msg.sender);
     }
     
    
     
     function withdraw() public onlyOwner {
-        for (uint256 funderIndex=0; funderIndex < funders.length; funderIndex++){
-            address funder = funders[funderIndex];
-            addressToAmountFunded[funder] = 0;
+        for (uint256 funderIndex=0; funderIndex < s_funders.length; funderIndex++){
+            address funder = s_funders[funderIndex];
+            s_addressToAmountFunded[funder] = 0;
         }
-        funders = new address[](0);
+        s_funders = new address[](0);
         // // transfer
         // payable(msg.sender).transfer(address(this).balance);
         // // send
@@ -76,8 +76,37 @@ contract FundMe {
         (bool callSuccess, ) = payable(msg.sender).call{value: address(this).balance}("");
         require(callSuccess, "Call failed");
     }
+    function cheaperWithdraw() public payable onlyOwner {
+        address[] memory funders = s_funders;
+        // mappings can't be in memory 
+        for(uint256 funderIndex = 0 ; funderIndex < funders.length; funderIndex++){
+            address funder = funders[funderIndex];
+            s_addressToAmountFunded[funder] = 0;
+        }
+        s_funders = new address[](0);
+        (bool success, ) = i_owner.call{value: address(this).balance}("");
+        require(success);
+
+    }
 
 
+    // view/pure
+
+    function getOwner()public view returns(address){
+        return i_owner;
+    }
+
+    function getFunder(uint256 index) public view returns(address){
+        return s_funders[index];
+    }
+
+    function getAddresstoAmountFunded(address funder) public view returns(uint256){
+        return s_addressToAmountFunded[funder];
+    }
+
+    function getPriceFeed() public view returns(AggregatorV3Interface){
+        return s_priceFeed;
+    }
     
 
 }
